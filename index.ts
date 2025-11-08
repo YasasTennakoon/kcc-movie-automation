@@ -103,7 +103,7 @@ app.get('/kcc', async (req, res) => {
         const message = await fetchShowtimes(date)
         res.json({ date, message })
     } catch (err: any) {
-        res.status(10).json({ error: err.message })
+        res.status(500).json({ error: err.message })
     }
 })
 
@@ -114,7 +114,7 @@ app.get('/kcc/siri', async (req, res) => {
         res.setHeader('Content-Type', 'text/plain')
         res.send(message)
     } catch (err: any) {
-        res.status(10).send('Sorry, I could not get the showtimes right now.')
+        res.status(500).send('Sorry, I could not get the showtimes right now.')
     }
 })
 
