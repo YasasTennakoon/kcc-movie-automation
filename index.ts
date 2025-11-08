@@ -12,13 +12,16 @@ function getToday(): string {
     return `${dd}-${mm}-${yyyy}`
 }
 
-const WAIT_SHORT = 100
-const WAIT_MEDIUM = 150
-const WAIT_LONG = 200
+const WAIT_SHORT = 1500   // 1.5s
+const WAIT_MEDIUM = 4000  // 4s
+const WAIT_LONG = 10000   // 10s
+
 
 async function fetchShowtimes(formattedDate: string) {
     const browser = await chromium.launch({ headless: true, args: ["--no-sandbox", "--disable-dev-shm-usage"] })
     const page = await browser.newPage()
+    console.log(formattedDate);
+
 
     await page.goto('https://kccmultiplex.lk/buy-tickets/', { waitUntil: 'domcontentloaded' })
 
