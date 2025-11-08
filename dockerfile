@@ -1,5 +1,6 @@
 # Use Playwright’s official base image (includes Chromium + deps)
-FROM mcr.microsoft.com/playwright:v1.48.2-jammy
+FROM mcr.microsoft.com/playwright:v1.56.1-jammy
+
 
 # Set working directory
 WORKDIR /app
