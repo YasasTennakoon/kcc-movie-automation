@@ -141,6 +141,14 @@ async function fetchShowtimes(formattedDate: string) {
     return summary.trim()
 }
 
+declare global {
+    var lastShowtimes: {
+        date: string
+        message: string
+        updatedAt: Date
+    } | undefined
+}
+
 app.get('/kcc', async (req, res) => {
     try {
         const date = getToday()
@@ -151,15 +159,40 @@ app.get('/kcc', async (req, res) => {
     }
 })
 
-app.get('/kcc/siri', async (req, res) => {
+app.get('/kcc/siri/init', async (req, res) => {
+    res.setHeader('Content-Type', 'text/plain')
+    res.send('Fetching latest showtimes, please wait...')
+
     try {
         const date = getToday()
         const message = await fetchShowtimes(date)
-        res.setHeader('Content-Type', 'text/plain')
-        res.send(message)
+        global.lastShowtimes = { date, message, updatedAt: new Date() }
     } catch (err: any) {
-        res.status(500).send('Sorry, I could not get the showtimes right now.')
+        console.error('Error during background fetch:', err.message)
     }
 })
+
+app.get('/kcc/siri/final', (req, res) => {
+    res.setHeader('Content-Type', 'text/plain')
+    if (
+        lastShowtimes &&
+        Date.now() - lastShowtimes.updatedAt.getTime() < 5 * 60 * 1000
+    ) {
+        res.send(lastShowtimes.message)
+    } else {
+        res.send('Showtimes are not ready yet, please wait a moment.')
+    }
+})
+
+// app.get('/kcc/siri', async (req, res) => {
+//     try {
+//         const date = getToday()
+//         const message = await fetchShowtimes(date)
+//         res.setHeader('Content-Type', 'text/plain')
+//         res.send(message)
+//     } catch (err: any) {
+//         res.status(500).send('Sorry, I could not get the showtimes right now.')
+//     }
+// })
 
 app.listen(PORT, () => console.log(`🚀 KCC API running on port ${PORT}`))
