@@ -38,7 +38,7 @@ async function getBrowser() {
 }
 
 let cache: { date: string; message: string; timestamp: number } | null = null
-const CACHE_TTL = 10 * 60 * 1000 // 10 minutes
+const CACHE_TTL = 1 * 60 * 1000 // 10 minutes
 
 async function getCachedShowtimes(date: string) {
     if (cache && cache.date === date && Date.now() - cache.timestamp < CACHE_TTL) {
