@@ -4,7 +4,6 @@ import { chromium } from 'playwright'
 const app = express()
 const PORT = process.env.PORT || 3000
 
-//For now added need bring the option to pass respective dates
 function getToday(): string {
     const today = new Date()
     const dd = String(today.getDate()).padStart(2, '0')
@@ -13,8 +12,12 @@ function getToday(): string {
     return `${dd}-${mm}-${yyyy}`
 }
 
+const WAIT_SHORT = 500
+const WAIT_MEDIUM = 1000
+const WAIT_LONG = 1500
+
 async function fetchShowtimes(formattedDate: string) {
-    const browser = await chromium.launch({ headless: true })
+    const browser = await chromium.launch({ headless: false })
     const page = await browser.newPage()
 
     await page.goto('https://kccmultiplex.lk/buy-tickets/', { waitUntil: 'domcontentloaded' })
@@ -22,7 +25,7 @@ async function fetchShowtimes(formattedDate: string) {
     const dateSelector = `input[name="date"][value="${formattedDate}"]`
     const labelSelector = `label[for="date-${formattedDate}"]`
     try {
-        await page.waitForSelector(dateSelector, { state: 'attached', timeout: 15000 })
+        await page.waitForSelector(dateSelector, { state: 'attached', timeout: WAIT_MEDIUM })
         const label = page.locator(labelSelector)
         await label.scrollIntoViewIfNeeded()
         await label.click({ force: true })
@@ -31,8 +34,8 @@ async function fetchShowtimes(formattedDate: string) {
         return { error: `Date ${formattedDate} not available` }
     }
 
-    await page.getByRole('heading', { name: /select a movie/i }).waitFor({ timeout: 10 })
-    await page.waitForSelector('input[name="movie"]', { state: 'attached', timeout: 10 })
+    await page.getByRole('heading', { name: /select a movie/i }).waitFor({ timeout: WAIT_LONG })
+    await page.waitForSelector('input[name="movie"]', { state: 'attached', timeout: WAIT_MEDIUM })
 
     const movies = await page.evaluate(() => {
         const inputs = document.querySelectorAll<HTMLInputElement>('input[name="movie"]')
@@ -47,11 +50,9 @@ async function fetchShowtimes(formattedDate: string) {
     for (const movie of movies) {
         if (!movie.title) continue
         const movieLabel = `label[for="${movie.id}"]`
-
         await page.locator(movieLabel).click({ force: true })
-        await page.waitForTimeout(10)
-
-        await page.waitForSelector('input[name="cinema"]', { timeout: 10 }).catch(() => null)
+        await page.waitForTimeout(WAIT_SHORT)
+        await page.waitForSelector('input[name="cinema"]', { timeout: WAIT_SHORT }).catch(() => null)
         const cinemas = await page.evaluate(() => {
             const cinemaInputs = document.querySelectorAll<HTMLInputElement>('input[name="cinema"]')
             return Array.from(cinemaInputs).map((cinema) => ({
@@ -66,8 +67,7 @@ async function fetchShowtimes(formattedDate: string) {
             if (!cinema.name) continue
             const cinemaLabel = `label[for="${cinema.id}"]`
             await page.locator(cinemaLabel).click({ force: true })
-            await page.waitForTimeout(110)
-
+            await page.waitForTimeout(WAIT_SHORT)
             const showtimes = await page.evaluate(() => {
                 const timeEls = document.querySelectorAll(
                     '.showtimes button, [class*="showtime"] button, label[for^="showtime-"]'
@@ -76,7 +76,6 @@ async function fetchShowtimes(formattedDate: string) {
                     .map((el) => el.textContent?.trim())
                     .filter(Boolean)
             })
-
             cinemaResults[cinema.name] = showtimes.length ? showtimes : ['No showtimes available']
         }
 
