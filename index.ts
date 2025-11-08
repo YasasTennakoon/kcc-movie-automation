@@ -144,7 +144,7 @@ async function fetchShowtimes(formattedDate: string) {
 app.get('/kcc', async (req, res) => {
     try {
         const date = getToday()
-        const message = await getCachedShowtimes(date)
+        const message = await fetchShowtimes(date)
         res.json({ date, message })
     } catch (err: any) {
         res.status(500).json({ error: err.message })
@@ -154,7 +154,7 @@ app.get('/kcc', async (req, res) => {
 app.get('/kcc/siri', async (req, res) => {
     try {
         const date = getToday()
-        const message = await getCachedShowtimes(date)
+        const message = await fetchShowtimes(date)
         res.setHeader('Content-Type', 'text/plain')
         res.send(message)
     } catch (err: any) {
