@@ -1,5 +1,5 @@
 import express from 'express'
-import { chromium } from 'playwright'
+import { chromium, Browser } from 'playwright'
 
 const app = express()
 const PORT = process.env.PORT || 3000
@@ -12,16 +12,47 @@ function getToday(): string {
     return `${dd}-${mm}-${yyyy}`
 }
 
-const WAIT_SHORT = 1500   // 1.5s
-const WAIT_MEDIUM = 4000  // 4s
-const WAIT_LONG = 10000   // 10s
+const WAIT_SHORT = 1000
+const WAIT_MEDIUM = 3000
+const WAIT_LONG = 8000
 
+let browser: Browser | null = null
+async function getBrowser() {
+    if (!browser) {
+        browser = await chromium.launch({
+            headless: true,
+            args: [
+                '--no-sandbox',
+                '--disable-dev-shm-usage',
+                '--disable-extensions',
+                '--disable-gpu',
+                '--no-first-run',
+                '--no-default-browser-check',
+                '--disable-background-networking',
+                '--disable-sync',
+            ],
+        })
+        console.log('✅ Chromium launched once')
+    }
+    return browser
+}
+
+let cache: { date: string; message: string; timestamp: number } | null = null
+const CACHE_TTL = 10 * 60 * 1000 // 10 minutes
+
+async function getCachedShowtimes(date: string) {
+    if (cache && cache.date === date && Date.now() - cache.timestamp < CACHE_TTL) {
+        console.log('⚡ Using cached showtimes')
+        return cache.message
+    }
+    const message = await fetchShowtimes(date)
+    cache = { date, message, timestamp: Date.now() }
+    return message
+}
 
 async function fetchShowtimes(formattedDate: string) {
-    const browser = await chromium.launch({ headless: true, args: ["--no-sandbox", "--disable-dev-shm-usage"] })
+    const browser = await getBrowser()
     const page = await browser.newPage()
-    console.log(formattedDate);
-
 
     await page.goto('https://kccmultiplex.lk/buy-tickets/', { waitUntil: 'domcontentloaded' })
 
@@ -33,12 +64,16 @@ async function fetchShowtimes(formattedDate: string) {
         await label.scrollIntoViewIfNeeded()
         await label.click({ force: true })
     } catch {
-        await browser.close()
-        return { error: `Date ${formattedDate} not available` }
+        await page.close()
+        return `⚠️ Date ${formattedDate} not available`
     }
 
-    await page.getByRole('heading', { name: /select a movie/i }).waitFor({ timeout: WAIT_LONG })
-    await page.waitForSelector('input[name="movie"]', { state: 'attached', timeout: WAIT_MEDIUM })
+    await Promise.race([
+        page.getByRole('heading', { name: /select a movie/i }).waitFor({ timeout: WAIT_LONG }),
+        page.waitForTimeout(WAIT_LONG),
+    ])
+
+    await page.waitForSelector('input[name="movie"]', { state: 'attached', timeout: WAIT_LONG })
 
     const movies = await page.evaluate(() => {
         const inputs = document.querySelectorAll<HTMLInputElement>('input[name="movie"]')
@@ -55,7 +90,12 @@ async function fetchShowtimes(formattedDate: string) {
         const movieLabel = `label[for="${movie.id}"]`
         await page.locator(movieLabel).click({ force: true })
         await page.waitForTimeout(WAIT_SHORT)
-        await page.waitForSelector('input[name="cinema"]', { timeout: WAIT_SHORT }).catch(() => null)
+
+        await Promise.race([
+            page.waitForSelector('input[name="cinema"]', { timeout: WAIT_MEDIUM }),
+            page.waitForTimeout(WAIT_SHORT),
+        ]).catch(() => null)
+
         const cinemas = await page.evaluate(() => {
             const cinemaInputs = document.querySelectorAll<HTMLInputElement>('input[name="cinema"]')
             return Array.from(cinemaInputs).map((cinema) => ({
@@ -71,6 +111,7 @@ async function fetchShowtimes(formattedDate: string) {
             const cinemaLabel = `label[for="${cinema.id}"]`
             await page.locator(cinemaLabel).click({ force: true })
             await page.waitForTimeout(WAIT_SHORT)
+
             const showtimes = await page.evaluate(() => {
                 const timeEls = document.querySelectorAll(
                     '.showtimes button, [class*="showtime"] button, label[for^="showtime-"]'
@@ -79,13 +120,14 @@ async function fetchShowtimes(formattedDate: string) {
                     .map((el) => el.textContent?.trim())
                     .filter(Boolean)
             })
+
             cinemaResults[cinema.name] = showtimes.length ? showtimes : ['No showtimes available']
         }
 
         results[movie.title] = cinemaResults
     }
 
-    await browser.close()
+    await page.close()
 
     let summary = `🎬 KCC Multiplex showtimes for ${formattedDate}:\n\n`
     for (const [movie, cinemas] of Object.entries(results)) {
@@ -102,7 +144,7 @@ async function fetchShowtimes(formattedDate: string) {
 app.get('/kcc', async (req, res) => {
     try {
         const date = getToday()
-        const message = await fetchShowtimes(date)
+        const message = await getCachedShowtimes(date)
         res.json({ date, message })
     } catch (err: any) {
         res.status(500).json({ error: err.message })
@@ -112,7 +154,7 @@ app.get('/kcc', async (req, res) => {
 app.get('/kcc/siri', async (req, res) => {
     try {
         const date = getToday()
-        const message = await fetchShowtimes(date)
+        const message = await getCachedShowtimes(date)
         res.setHeader('Content-Type', 'text/plain')
         res.send(message)
     } catch (err: any) {
