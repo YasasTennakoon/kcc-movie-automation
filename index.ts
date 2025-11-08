@@ -5,7 +5,7 @@ const app = express()
 const PORT = process.env.PORT || 3000
 
 function getToday(): string {
-    const today = new Date()
+    const today = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Colombo" }))
     const dd = String(today.getDate()).padStart(2, '0')
     const mm = String(today.getMonth() + 1).padStart(2, '0')
     const yyyy = today.getFullYear()
