@@ -129,11 +129,11 @@ async function fetchShowtimes(formattedDate: string) {
 
     await page.close()
 
-    let summary = `🎬 KCC Multiplex showtimes for ${formattedDate}:\n\n`
+    let summary = `KCC Multiplex showtimes for today:\n\n`
     for (const [movie, cinemas] of Object.entries(results)) {
-        summary += `🎞️ ${movie}\n`
+        summary += `${movie}\n`
         for (const [cinema, times] of Object.entries(cinemas)) {
-            summary += `  🍿 ${cinema}: ${(times as string[]).join(', ')}\n`
+            summary += `${cinema}: ${(times as string[]).join(', ')}\n`
         }
         summary += '\n'
     }
